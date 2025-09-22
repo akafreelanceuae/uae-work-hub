@@ -1,10 +1,52 @@
 {
   "name": "uae-work-hub",
   "version": "0.1.0",
+  "description": "GCC-compliant, culturally intelligent hybrid work collaboration platform for UAE multinational workforces",
   "private": true,
-  "workspaces": ["frontend", "backend"],
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
   "scripts": {
-    "dev:frontend": "npm --workspace frontend run dev",
-    "dev:backend": "npm --workspace backend run dev"
-  }
+    "build": "turbo build",
+    "dev": "turbo dev",
+    "dev:web": "turbo dev --filter=web",
+    "dev:api": "turbo dev --filter=api",
+    "dev:ai": "cd apps/ai && uvicorn src.main:app --reload --port 8000",
+    "lint": "turbo lint",
+    "lint:fix": "turbo lint:fix",
+    "test": "turbo test",
+    "test:watch": "turbo test:watch",
+    "type-check": "turbo type-check",
+    "clean": "turbo clean",
+    "format": "prettier --write \"**/*.{ts,tsx,md,json}\"",
+    "format:check": "prettier --check \"**/*.{ts,tsx,md,json}\"",
+    "docker:up": "docker-compose up -d",
+    "docker:down": "docker-compose down",
+    "setup": "npm install && cd apps/ai && python -m venv .venv && source .venv/bin/activate && pip install -r requirements.txt"
+  },
+  "devDependencies": {
+    "@turbo/gen": "^1.13.3",
+    "@typescript-eslint/eslint-plugin": "^7.7.0",
+    "@typescript-eslint/parser": "^7.7.0",
+    "eslint": "^8.57.0",
+    "eslint-config-prettier": "^9.1.0",
+    "eslint-plugin-import": "^2.29.1",
+    "prettier": "^3.2.5",
+    "turbo": "^1.13.3",
+    "typescript": "^5.4.5"
+  },
+  "packageManager": "npm@10.2.4",
+  "keywords": [
+    "uae",
+    "gcc",
+    "collaboration",
+    "hybrid-work",
+    "arabic",
+    "cultural-intelligence",
+    "video-conferencing",
+    "project-management"
+  ],
+  "license": "UNLICENSED",
+  "author": "UAE Work Hub Team"
 }

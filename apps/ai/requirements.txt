@@ -1,0 +1,48 @@
+fastapi==0.104.1
+uvicorn[standard]==0.24.0
+pydantic==2.5.2
+pydantic-settings==2.1.0
+python-multipart==0.0.6
+httpx==0.25.2
+aiofiles==23.2.1
+
+# Arabic NLP and Machine Learning
+tensorflow==2.15.0
+transformers==4.36.2
+torch==2.1.2
+torchaudio==2.1.2
+torchvision==0.16.2
+librosa==0.10.1
+soundfile==1.0.0
+datasets==2.15.0
+tokenizers==0.15.0
+
+# Arabic text processing
+arabic-reshaper==3.0.0
+python-bidi==0.4.2
+pyarabic==0.6.15
+
+# Audio processing for transcription
+whisper-openai==20231117
+speechrecognition==3.10.0
+pyaudio==0.2.11
+pydub==0.25.1
+
+# Date and calendar processing for UAE cultural features
+hijri-converter==2.3.1
+python-dateutil==2.8.2
+pytz==2023.3
+
+# Database and caching
+redis==5.0.1
+motor==3.3.2
+
+# Monitoring and logging
+prometheus-client==0.19.0
+structlog==23.2.0
+
+# Development and testing
+pytest==7.4.3
+pytest-asyncio==0.21.1
+black==23.11.0
+ruff==0.1.6
