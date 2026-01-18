@@ -1,0 +1,69 @@
+name: dependency-audit
+
+on:
+  workflow_dispatch:
+  push:
+    branches: ["main"]
+    paths:
+      - "package.json"
+      - "package-lock.json"
+      - "apps/**/package.json"
+      - "apps/**/package-lock.json"
+      - "apps/ai/requirements.txt"
+
+jobs:
+  npm-audit:
+    name: NPM audit (monorepo)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+
+      - name: Install deps
+        run: npm ci
+
+      - name: npm audit (root)
+        continue-on-error: true
+        run: |
+          npm audit --omit=dev --audit-level=high --json > npm-audit.json || true
+
+      - name: Upload npm audit report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: npm-audit
+          path: npm-audit.json
+
+  pip-audit:
+    name: pip-audit (AI service)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install pip-audit
+        run: pip install pip-audit
+
+      - name: Run pip-audit on requirements
+        working-directory: apps/ai
+        continue-on-error: true
+        run: |
+          pip-audit -r requirements.txt -f json -o pip-audit.json || true
+
+      - name: Upload pip-audit report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: pip-audit
+          path: apps/ai/pip-audit.json

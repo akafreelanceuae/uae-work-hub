@@ -1,0 +1,115 @@
+name: ci
+
+on:
+  push:
+    branches: ["main"]
+  pull_request:
+    branches: ["main"]
+
+jobs:
+  build-and-push:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ secrets.GHCR_USERNAME }}
+          password: ${{ secrets.GHCR_TOKEN }}
+
+      - name: Compute tags
+        id: vars
+        run: |
+          SHA=${GITHUB_SHA::7}
+          echo "sha=${SHA}" >> $GITHUB_OUTPUT
+          echo "owner=${{ secrets.IMAGE_OWNER }}" >> $GITHUB_OUTPUT
+
+      - name: Build and push API image
+        uses: docker/build-push-action@v6
+        with:
+          context: ./apps/api
+          file: ./apps/api/Dockerfile
+          push: true
+          platforms: linux/amd64
+          tags: |
+            ghcr.io/${{ steps.vars.outputs.owner }}/uae-work-hub-api:${{ steps.vars.outputs.sha }}
+            ghcr.io/${{ steps.vars.outputs.owner }}/uae-work-hub-api:latest
+
+      - name: Build and push AI image
+        uses: docker/build-push-action@v6
+        with:
+          context: ./apps/ai
+          file: ./apps/ai/Dockerfile
+          push: true
+          platforms: linux/amd64
+          tags: |
+            ghcr.io/${{ steps.vars.outputs.owner }}/uae-work-hub-ai:${{ steps.vars.outputs.sha }}
+            ghcr.io/${{ steps.vars.outputs.owner }}/uae-work-hub-ai:latest
+
+      - name: Build and push Web image
+        uses: docker/build-push-action@v6
+        with:
+          context: ./apps/web
+          file: ./apps/web/Dockerfile
+          push: true
+          platforms: linux/amd64
+          tags: |
+            ghcr.io/${{ steps.vars.outputs.owner }}/uae-work-hub-web:${{ steps.vars.outputs.sha }}
+            ghcr.io/${{ steps.vars.outputs.owner }}/uae-work-hub-web:latest
+
+      - name: Trivy scan API image
+        uses: aquasecurity/trivy-action@0.20.0
+        with:
+          image-ref: ghcr.io/${{ steps.vars.outputs.owner }}/uae-work-hub-api:${{ steps.vars.outputs.sha }}
+          format: 'sarif'
+          output: 'trivy-api.sarif'
+          vuln-type: 'os,library'
+          ignore-unfixed: true
+          severity: 'CRITICAL,HIGH'
+          exit-code: '1'
+      - name: Upload Trivy API report
+        uses: github/codeql-action/upload-sarif@v3
+        if: always()
+        with:
+          sarif_file: trivy-api.sarif
+
+      - name: Trivy scan AI image
+        uses: aquasecurity/trivy-action@0.20.0
+        with:
+          image-ref: ghcr.io/${{ steps.vars.outputs.owner }}/uae-work-hub-ai:${{ steps.vars.outputs.sha }}
+          format: 'sarif'
+          output: 'trivy-ai.sarif'
+          vuln-type: 'os,library'
+          ignore-unfixed: true
+          severity: 'CRITICAL,HIGH'
+          exit-code: '1'
+      - name: Upload Trivy AI report
+        uses: github/codeql-action/upload-sarif@v3
+        if: always()
+        with:
+          sarif_file: trivy-ai.sarif
+
+      - name: Trivy scan Web image
+        uses: aquasecurity/trivy-action@0.20.0
+        with:
+          image-ref: ghcr.io/${{ steps.vars.outputs.owner }}/uae-work-hub-web:${{ steps.vars.outputs.sha }}
+          format: 'sarif'
+          output: 'trivy-web.sarif'
+          vuln-type: 'os,library'
+          ignore-unfixed: true
+          severity: 'CRITICAL,HIGH'
+          exit-code: '1'
+      - name: Upload Trivy Web report
+        uses: github/codeql-action/upload-sarif@v3
+        if: always()
+        with:
+          sarif_file: trivy-web.sarif

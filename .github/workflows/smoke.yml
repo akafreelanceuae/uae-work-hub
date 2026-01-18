@@ -1,0 +1,81 @@
+name: smoke-tests
+
+on:
+  workflow_dispatch:
+  workflow_run:
+    workflows: ["cd-railway-api", "cd-k8s-api"]
+    types: [completed]
+
+jobs:
+  railway-smoke:
+    name: Railway /ready (fallback /health)
+    runs-on: ubuntu-latest
+    if: ${{ secrets.RAILWAY_HEALTH_URL != '' }}
+    timeout-minutes: 5
+    steps:
+      - name: Curl Railway readiness/health (with retries)
+        env:
+          READY_URL: ${{ secrets.RAILWAY_READY_URL }}
+          HEALTH_URL: ${{ secrets.RAILWAY_HEALTH_URL }}
+        run: |
+          URL="$READY_URL"
+          if [ -z "$URL" ]; then URL="$HEALTH_URL"; fi
+          if [ -z "$URL" ]; then echo "No RAILWAY_READY_URL or RAILWAY_HEALTH_URL provided"; exit 1; fi
+          echo "Hitting $URL"
+          for i in {1..12}; do
+            STATUS=$(curl -fsSL -o /tmp/health.json -w "%{http_code}" "$URL" || true)
+            if [ "$STATUS" = "200" ]; then
+              echo "OK (200):" && cat /tmp/health.json
+              exit 0
+            fi
+            echo "Attempt $i failed (status=$STATUS). Retrying..."
+            sleep 5
+          done
+          echo "Readiness/health check failed for Railway endpoint"
+          exit 1
+
+  k8s-smoke:
+    name: K8s /health via port-forward
+    runs-on: ubuntu-latest
+    if: ${{ secrets.KUBE_CONFIG != '' }}
+    timeout-minutes: 10
+    steps:
+      - name: Setup kubectl
+        uses: azure/setup-kubectl@v4
+        with:
+          version: 'v1.30.0'
+      - name: Configure kubeconfig
+        env:
+          KUBE_CONFIG: ${{ secrets.KUBE_CONFIG }}
+        run: |
+          echo "$KUBE_CONFIG" > kubeconfig.yaml
+          echo "KUBECONFIG=$PWD/kubeconfig.yaml" >> $GITHUB_ENV
+      - name: Port-forward and curl health
+        env:
+          SMOKE_K8S_NAMESPACE: ${{ secrets.SMOKE_K8S_NAMESPACE }}
+          SMOKE_K8S_SERVICE: ${{ secrets.SMOKE_K8S_SERVICE }}
+        run: |
+          set -euo pipefail
+          NAMESPACE="${SMOKE_K8S_NAMESPACE:-uae-work-hub}"
+          SERVICE="${SMOKE_K8S_SERVICE:-api}"
+          echo "Port-forwarding svc/$SERVICE in ns/$NAMESPACE to localhost:8080"
+          kubectl -n "$NAMESPACE" port-forward svc/"$SERVICE" 8080:80 >/tmp/pf.log 2>&1 &
+          PF_PID=$!
+          trap 'kill $PF_PID || true' EXIT
+          # Wait for port-forward to be ready
+          for i in {1..12}; do
+            nc -z localhost 8080 && break || true
+            sleep 2
+          done
+          echo "Hitting http://localhost:8080/ready"
+          for i in {1..12}; do
+            STATUS=$(curl -fsSL -o /tmp/health.json -w "%{http_code}" http://localhost:8080/ready || true)
+            if [ "$STATUS" = "200" ]; then
+              echo "OK (200):" && cat /tmp/health.json
+              exit 0
+            fi
+            echo "Attempt $i failed (status=$STATUS). Retrying..."
+            sleep 5
+          done
+          echo "Health check failed for K8s service"
+          exit 1

@@ -1,0 +1,75 @@
+name: cd-railway-api
+
+on:
+  workflow_dispatch:
+  push:
+    branches: ["main"]
+    paths:
+      - "apps/api/**"
+      - ".github/workflows/cd-railway-api.yml"
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Compute image tag and owner
+        id: vars
+        run: |
+          SHA=${GITHUB_SHA::7}
+          echo "sha=${SHA}" >> $GITHUB_OUTPUT
+
+      - name: Install Railway CLI
+        run: npm i -g @railway/cli
+
+      - name: Set build metadata in Railway
+        if: ${{ secrets.RAILWAY_TOKEN != '' }}
+        env:
+          RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
+        run: |
+          railway variables set BUILD_SHA=${{ steps.vars.outputs.sha }} --service api || true
+          railway variables set BUILD_TIME=$(date -u +%Y-%m-%dT%H:%M:%SZ) --service api || true
+          railway variables set IMAGE_TAG=${{ steps.vars.outputs.sha }} --service api || true
+
+      - name: Set API environment variables in Railway
+        working-directory: apps/api
+        env:
+          RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
+          MONGODB_URI: ${{ secrets.MONGODB_URI }}
+          REDIS_URL: ${{ secrets.REDIS_URL }}
+          JWT_SECRET: ${{ secrets.JWT_SECRET }}
+          JWT_REFRESH_SECRET: ${{ secrets.JWT_REFRESH_SECRET }}
+          JWT_EMAIL_SECRET: ${{ secrets.JWT_EMAIL_SECRET }}
+          JWT_RESET_SECRET: ${{ secrets.JWT_RESET_SECRET }}
+          FRONTEND_URL: ${{ secrets.FRONTEND_URL }}
+          ALLOWED_ORIGINS: ${{ secrets.ALLOWED_ORIGINS }}
+          AI_URL: ${{ secrets.AI_URL }}
+        run: |
+          set -euo pipefail
+          set +x
+          for key in MONGODB_URI REDIS_URL JWT_SECRET JWT_REFRESH_SECRET JWT_EMAIL_SECRET JWT_RESET_SECRET FRONTEND_URL ALLOWED_ORIGINS AI_URL; do
+            val="${!key:-}"
+            if [ -n "$val" ]; then
+              railway variables set "$key=$val" --service api > /dev/null 2>&1 || true
+            fi
+          done
+
+      - name: Deploy API using pinned image (if enabled)
+        if: ${{ secrets.RAILWAY_USE_IMAGE == 'true' }}
+        env:
+          RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
+          IMAGE_OWNER: ${{ secrets.IMAGE_OWNER }}
+        run: |
+          IMAGE="ghcr.io/${IMAGE_OWNER}/uae-work-hub-api:${{ steps.vars.outputs.sha }}"
+          echo "Deploying image: $IMAGE"
+          # Requires Railway project/service configured for image deployments
+          railway deploy --service api --image "$IMAGE" --yes || exit 1
+
+      - name: Fallback deploy from source (if image mode disabled)
+        if: ${{ secrets.RAILWAY_USE_IMAGE != 'true' }}
+        working-directory: apps/api
+        env:
+          RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
+        run: railway up --service api --yes

@@ -1,0 +1,64 @@
+# Example values override for API Helm chart
+# Copy this file and customize values for your environment, then pass with `-f`.
+
+replicaCount: 2
+
+image:
+  repository: ghcr.io/<IMAGE_OWNER>/uae-work-hub-api
+  tag: <GIT_SHA7>
+  pullPolicy: Always
+
+service:
+  type: ClusterIP
+  port: 80
+  targetPort: 5000
+
+resources:
+  requests:
+    cpu: 200m
+    memory: 256Mi
+  limits:
+    cpu: 500m
+    memory: 512Mi
+
+hpa:
+  enabled: true
+  minReplicas: 2
+  maxReplicas: 10
+  targetCPUUtilizationPercentage: 70
+
+env:
+  nodeEnv: production
+  port: 5000
+  enableMetrics: true
+  enableTracing: true
+  requireRedisReady: true
+  requireOriginInProd: true
+
+secrets:
+  create: true
+  name: api-secrets
+  data:
+    MONGODB_URI: "mongodb://mongo.namespace:27017/uae_work_hub"
+    REDIS_URL: "redis://redis.namespace:6379"
+    FRONTEND_URL: "http://app.namespace.svc.cluster.local"
+    ALLOWED_ORIGINS: "http://app.namespace.svc.cluster.local"
+    JWT_SECRET: "change_me"
+    JWT_REFRESH_SECRET: "change_me_refresh"
+    JWT_EMAIL_SECRET: "change_me_email"
+    JWT_RESET_SECRET: "change_me_reset"
+    AI_URL: "http://ai.namespace.svc.cluster.local:8000"
+    OTEL_EXPORTER_OTLP_ENDPOINT: "http://otel-collector.otel.svc.cluster.local:4318/v1/traces"
+    OTEL_SERVICE_NAME: "uae-work-hub-api"
+    OTEL_EXPORTER_OTLP_HEADERS: ""
+    CSP_SCRIPT_SRC: "https://*.uaeworkhub.ae"
+    CSP_STYLE_SRC: "https://*.uaeworkhub.ae"
+    CSP_IMG_SRC: "https://*.uaeworkhub.ae,https://*.dubai.ae"
+    CSP_CONNECT_SRC: "https://*.uaeworkhub.ae"
+    CSP_FONT_SRC: "https://*.uaeworkhub.ae"
+    CSP_MEDIA_SRC: "https://*.uaeworkhub.ae"
+    CSP_FRAME_SRC: "'none'"
+    APP_VERSION: "0.1.0"
+    BUILD_SHA: "<GIT_SHA7>"
+    BUILD_TIME: "2025-01-01T00:00:00Z"
+    IMAGE_TAG: "<GIT_SHA7>"

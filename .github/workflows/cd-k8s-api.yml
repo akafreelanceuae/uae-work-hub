@@ -1,0 +1,81 @@
+name: cd-k8s-api
+
+on:
+  workflow_dispatch:
+  push:
+    branches: ["main"]
+    paths:
+      - "deploy/k8s/backend/**"
+      - ".github/workflows/cd-k8s-api.yml"
+      - "apps/api/**"
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup kubectl
+        uses: azure/setup-kubectl@v4
+        with:
+          version: 'v1.30.0'
+
+      - name: Setup Helm
+        uses: azure/setup-helm@v4
+        with:
+          version: 'v3.14.4'
+
+      - name: Configure KUBECONFIG
+        env:
+          KUBE_CONFIG: ${{ secrets.KUBE_CONFIG }}
+        run: |
+          echo "$KUBE_CONFIG" > kubeconfig.yaml
+          echo "KUBECONFIG=$PWD/kubeconfig.yaml" >> $GITHUB_ENV
+
+      - name: Compute image coordinates
+        id: vars
+        run: |
+          SHA=${GITHUB_SHA::7}
+          echo "sha=${SHA}" >> $GITHUB_OUTPUT
+
+      - name: Render secret values
+        id: render
+        env:
+          MONGODB_URI: ${{ secrets.MONGODB_URI }}
+          REDIS_URL: ${{ secrets.REDIS_URL }}
+          FRONTEND_URL: ${{ secrets.FRONTEND_URL }}
+          ALLOWED_ORIGINS: ${{ secrets.ALLOWED_ORIGINS }}
+          JWT_SECRET: ${{ secrets.JWT_SECRET }}
+          JWT_REFRESH_SECRET: ${{ secrets.JWT_REFRESH_SECRET }}
+          JWT_EMAIL_SECRET: ${{ secrets.JWT_EMAIL_SECRET }}
+          JWT_RESET_SECRET: ${{ secrets.JWT_RESET_SECRET }}
+          AI_URL: ${{ secrets.AI_URL }}
+        run: |
+          set -euo pipefail
+          cat > secret-values.yaml <<EOF
+          secrets:
+            create: true
+            name: api-secrets
+            data:
+              MONGODB_URI: "${MONGODB_URI}"
+              REDIS_URL: "${REDIS_URL}"
+              FRONTEND_URL: "${FRONTEND_URL}"
+              ALLOWED_ORIGINS: "${ALLOWED_ORIGINS}"
+              JWT_SECRET: "${JWT_SECRET}"
+              JWT_REFRESH_SECRET: "${JWT_REFRESH_SECRET}"
+              JWT_EMAIL_SECRET: "${JWT_EMAIL_SECRET}"
+              JWT_RESET_SECRET: "${JWT_RESET_SECRET}"
+              AI_URL: "${AI_URL}"
+          EOF
+
+      - name: Helm upgrade/install API
+        env:
+          IMAGE_OWNER: ${{ secrets.IMAGE_OWNER }}
+        run: |
+          helm upgrade --install api deploy/charts/api \
+            --namespace uae-work-hub --create-namespace \
+            --set image.repository=ghcr.io/${IMAGE_OWNER}/uae-work-hub-api \
+            --set image.tag=${{ steps.vars.outputs.sha }} \
+            -f secret-values.yaml \
+            --wait --timeout 180s

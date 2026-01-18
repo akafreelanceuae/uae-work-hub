@@ -1,0 +1,61 @@
+replicaCount: 2
+
+image:
+  repository: ghcr.io/IMAGE_OWNER/uae-work-hub-api
+  tag: latest
+  pullPolicy: Always
+
+service:
+  type: ClusterIP
+  port: 80
+  targetPort: 5000
+
+resources:
+  requests:
+    cpu: 200m
+    memory: 256Mi
+  limits:
+    cpu: 500m
+    memory: 512Mi
+
+hpa:
+  enabled: true
+  minReplicas: 2
+  maxReplicas: 10
+  targetCPUUtilizationPercentage: 70
+
+env:
+  nodeEnv: production
+  port: 5000
+  enableMetrics: true
+  enableTracing: false
+  requireRedisReady: false
+  requireOriginInProd: true
+
+secrets:
+  create: true
+  name: api-secrets
+  data:
+    MONGODB_URI: ""
+    REDIS_URL: ""
+    FRONTEND_URL: ""
+    ALLOWED_ORIGINS: ""
+    JWT_SECRET: ""
+    JWT_REFRESH_SECRET: ""
+    JWT_EMAIL_SECRET: ""
+    JWT_RESET_SECRET: ""
+    AI_URL: ""
+    OTEL_EXPORTER_OTLP_ENDPOINT: ""
+    OTEL_SERVICE_NAME: "uae-work-hub-api"
+    OTEL_EXPORTER_OTLP_HEADERS: ""
+    CSP_SCRIPT_SRC: ""
+    CSP_STYLE_SRC: ""
+    CSP_IMG_SRC: ""
+    CSP_CONNECT_SRC: ""
+    CSP_FONT_SRC: ""
+    CSP_MEDIA_SRC: ""
+    CSP_FRAME_SRC: ""
+    APP_VERSION: "0.1.0"
+    BUILD_SHA: ""
+    BUILD_TIME: ""
+    IMAGE_TAG: ""
